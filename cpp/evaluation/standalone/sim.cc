@@ -6,7 +6,7 @@ Compile:
 Run: (all arguments are optional, defaults to 9 player full runouts)
   ./sim [number of other players 1-8] [cards on the board 3-5] [top % highlighted] [number of runouts per hand]
 e.g.
-  ./sim 5 3 10 1000
+x
   plays out 6 handed, just the flop, highlights the top 10% of hands, only runs 1000 simulations per hand (1M is better, but takes longer)
 
 this is the function to generate the runouts for the simulation
