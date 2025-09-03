@@ -463,6 +463,7 @@ If k=0, the only way to achieve a sum of 0 is to set all digits to 0, resulting 
 
 This illustrates how the dp array counts the number of valid quinary numbers for a given number of digits and a target sum k. And thus we can conclude that k = min(4, any numebr).
 Now we can iterate all dp[1][i][j]. We do this by iterating the next digit from 0 to 4 and evaluating the shorter expression for smaller k. :
+
 ```cpp
   for (int i = 2; i <= 13; ++i) {
     for (int j = 0; j <= 7; ++j) {
@@ -476,14 +477,16 @@ Now we can iterate all dp[1][i][j]. We do this by iterating the next digit from 
 ```
 For example, to evaluate dp[1][2][7] (which counts the number of 2-digit quinary numbers in the range [00, 10) whose digits sum to 7), we consider all possible values for the second digit (from 0 to 4). For each possible value, the first digit is determined as 7 minus that value. This gives the combinations 07, 16, 25, 34, and 43. However, most of these are invalid because at least one digit exceeds the maximum allowed value of 4 in base-5. Specifically, 07, 16, and 25 are invalid because the first digit would be greater than 4. In the dynamic programming table, this is handled because dp[1][1][k] = 0 for k > 4, so these cases contribute nothing to the sum.
 
-Now the iteration for the rest of the entries:
 
+Now the iteration for the rest of the entries:
+```cpp
   for each l in [2, 4] and i in [1, 13] and j in [0, 7]:
     dp[l][i][j] = dp[l-1][i][j] + dp[1][i][j-l+1]
+```
+
 For example dp[4][4][5], which is equivalent to the number of valid quinaries in the range [00000, 40000) with k=5. It can be splitted into [00000, 30000) with k=5, and [30000, 40000). The former one is dp[3][4][5], the latter one is equivalent to [00000, 10000) with k=k-3, which is dp[1][4][2].
 
-Finally we can compute the hash of the quinary base on the dp arrays. The example C code is shown below.
-
+Finally we can compute the hash of the quinary base on the dp arrays. The is the same algorithm as we mentioned above for binary bits, but we used a quinary setup instead of binary setup. 
 
 ```cpp
 int hash_quinary(unsigned char q[], int len, int k)
@@ -503,6 +506,223 @@ int hash_quinary(unsigned char q[], int len, int k)
   return ++sum;
 }
 ```
-In practice, the final increment can be ignored.
+In a nutshell this approach allows us to evaluate any 7-card poker hand extremely efficiently:
 
-The final lookup hash table will contain 49205 entries, and the hash function takes at most 13 cycles to compute. This algorithm is much better than any others that do 7-card poker evaluation by checking all 21 combinations.
+- **Hash Table Size:** The final lookup table contains exactly 49,205 entries. Each entry corresponds to a unique way to distribute 7 cards among the 13 possible ranks (from deuce to ace), where no rank has more than 4 cards (since there are only 4 suits).
+- **Hash Function Speed:** The hash function that maps a given hand’s quinary representation to its position in the table requires at most 13 simple steps—one for each rank. In each step, it uses a precomputed value from the `dp` array, making the calculation relatively faster.
+- **Efficiency Compared to Naive Methods:** Traditional 7-card poker hand evaluators often check all 21 possible 5-card combinations within the 7 cards, because there are $\binom{7}{5} = 21$ unique ways to choose 5 cards from 7. For each combination, the evaluator determines the best possible 5-card hand, which is computationally expensive. In contrast, this algorithm directly computes the hand’s rank using a single table lookup, after a quick hash calculation, without needing to enumerate combinations.
+
+After the computation of the rank, the evaluator can immediately determine the strength of the hand by looking up the precomputed value in the final table using the hash value as an index, with O(1) time complexity. This means that, once the hash function has mapped the hand's quinary representation to its unique position, the corresponding hand rank (such as "full house," "flush," etc.) is retrieved in constant time. This approach eliminates the need for further hand analysis or enumeration, allowing for extremely fast evaluation of 7-card poker hands.
+
+#### Dynamic programming appraoch
+In chapter one, we developed a method to map a 52-bit binary (with exactly k bits set) to a unique hash value in the range [0, 133,784,559]. While this results in a large hash table, it remains practical for modern hardware. If we can further optimize the speed of the hash function itself, this approach continues to be highly effective for fast hand evaluation.
+
+Let's go back to that problem HashNBinaryKSum:
+```
+ Problem: HashNBinaryKSum
+
+ Input: integer n, integer k, an n-bit binary with exactly k bits set to 1
+
+ Output: the position of the binary in the lexicographical ordering of all n-bit
+ binaries with exactly k bits of ones
+```
+
+More specifically, we are trying to solve a problem with n = 52 and k = 7. If we split the 52-bit binary into 4 blocks, where each block has 13 bits, we can precompute the results in a table of size 2^13 (all possible binary patterns in 13 bits) × 4 (block index) × 8 (possible values of k, i.e., the number of bits set in the block, since in any block of 13 or 16 bits, the number of set bits can range from 0 up to 7 in the context of 7-card hands). This allows us to do only 4 summations in the actual hash function.
+
+In practice, it is often easier to use a 16-bit block instead of 13 for several reasons. First, 16 bits aligns perfectly with standard data types (such as `uint16_t`), which simplifies memory access and manipulation in most programming languages and hardware architectures. This alignment allows for more efficient bitwise operations and enables the use of fast, direct indexing into lookup tables. Additionally, 16-bit blocks fit neatly into 64-bit or 128-bit registers, making it straightforward to split a 52-bit hand representation into four 16-bit chunks (with a few unused bits), which is much simpler than dealing with 13-bit boundaries that do not align with byte or word sizes. As a result, the lookup table size becomes 2^16 × 4 × 8, which is still manageable in modern memory, and the code for both table generation and hash computation is much cleaner and faster.
+
+Precomputing this table is similar to the methods we used in the previous chapters. 
+> Implementation: 
+```cpp
+const int ts = 2**16; 
+int hash_function (){
+  int dp[ts][4][8];
+
+  for (i=0; i<ts; i++) {
+    for (j=0; j<4; j++) {
+      for (k=0; k<8; k++) {
+        int ck = k;
+        int s;
+        int sum = 0;
+
+        for (s=15; s>=0; s--) {
+          if (i & (1 << s)) {
+            int n = j*16 + s;
+
+            sum += choose[n][ck];
+
+            ck--;
+          }
+        }
+
+        dp[i][j][k] = sum;
+      }
+    }
+  }
+}
+```
+This nested loop precomputes a dynamic programming (DP) table for fast hashing of 52-bit poker hands.
+The DP table, dp[i][j][k], stores the number of ways to choose k cards from the first (j*16 + 16) cards,
+given a specific 16-bit pattern (i) for the current block, the block index (j), and the number of cards left to choose (k).
+
+Here's how the algorithm works:
+
+- Outer loop (i): Iterates over all possible 16-bit patterns (0 to 65535). Each pattern represents a possible selection of cards in a 16-card block.
+- Middle loop (j): Iterates over the 4 blocks of 16 cards each (since 52 cards are split into 4 blocks of 16; the last block has unused bits).
+- Inner loop (k): Iterates over all possible numbers of cards to choose (from 0 to 7, since a poker hand has at most 7 cards).
+
+For each combination of (i, j, k):
+  - It initializes a counter (ck) to k, and sum to 0.
+  - It scans each bit (s) in the 16-bit block from most significant (15) to least (0).
+  - For block indices j = 0, 1, 2 (corresponding to cards 0..47), all 16 bits are considered.
+  - For block index j = 3 (corresponding to cards 48..51), only bits 0..3 are valid (representing cards 48..51); bits 4..15 are ignored (treated as 0).
+  - If the bit at position s is set in i (i.e., a card is present at that position and s is in the valid range for the block), it calculates the global card index n = j*16 + s.
+  - It adds the number of ways to choose ck cards from the remaining cards (choose[n][ck]) to sum.
+  - It decrements ck, since one card has been "used".
+  - After processing all valid bits, it stores the computed sum in dp[i][j][k].
+
+This DP table allows the hash function to quickly compute the lexicographical position of any 52-bit hand
+by summing up the precomputed values for each 16-bit block, resulting in a very fast hash calculation.
+
+>  Visualization of the DP Table Structure for Fast Hashing
+<!--
+  DP Table Structure for Fast Poker Hand Hashing
+
+  Each block covers a range of cards, and the DP table is indexed as dp[i][j][k]:
+    - i: 16-bit pattern for the block (0..65535)
+    - j: block index (0..3)
+    - k: number of cards to choose (0..7)
+-->
+
+| Block | Block Index (j) | Card Range      | DP Table Entry      | i Range      | k Range | Notes                                 |
+|-------|-----------------|-----------------|---------------------|--------------|---------|---------------------------------------|
+|  0    |       0         | cards 0–15      | dp[i][0][k]         | 0..65535     | 0..7    | All 16 bits used                      |
+|  1    |       1         | cards 16–31     | dp[i][1][k]         | 0..65535     | 0..7    | All 16 bits used                      |
+|  2    |       2         | cards 32–47     | dp[i][2][k]         | 0..65535     | 0..7    | All 16 bits used                      |
+|  3    |       3         | cards 48–51     | dp[i][3][k]         | 0..65535     | 0..7    | Only bits 0–3 used (bits 4–15 unused) |
+
+<div style="font-size: 0.95em; color: #c00; margin-top: 4px;">
+  * In Block 3, only bits 0–3 are valid (cards 48–51); bits 4–15 are unused.
+</div>
+
+- Only 52 cards are used, so the last block has only 4 valid bits (cards 48–51).
+- Each block's bits are independent and do not overlap; there is no sharing of bits between blocks.
+- The 52 cards are mapped to 4 blocks of 16 bits each (total 64 bits, but only 52 are used):
+    - Block 0: bits 0–15 → cards 0–15
+    - Block 1: bits 0–15 → cards 16–31
+    - Block 2: bits 0–15 → cards 32–47
+    - Block 3: bits 0–3  → cards 48–51 (bits 4–15 unused)
+
+**Hash Calculation Example:**
+
+For a hand split into 4 blocks (a[3], a[2], a[1], a[0]), and k cards to choose:
+</table>
+
+ Each cell is indexed by the 16-bit pattern i (0..65535) and number of cards k (0..7).
+
+ This structure allows fast lookup and summation for hashing any 52-bit hand.
+
+And the hash function only need to sum up the result from the dp table. The C code is shown below.
+```cpp
+int fast_hash(unsigned long long handid, int k)
+{
+  int hash = 0;
+
+  unsigned short * a = (unsigned short *)&handid;
+
+  hash += dp_fast[a[3]][3][k];
+  k -= bitcount[a[3]];
+
+  hash += dp_fast[a[2]][2][k];
+  k -= bitcount[a[2]];
+
+  hash += dp_fast[a[1]][1][k];
+  k -= bitcount[a[1]];
+
+  hash += dp_fast[a[0]][0][k];
+
+  return hash;
+}
+```
+ The 52 bits are divided into four blocks (three 16-bit blocks and one 4-bit block), and for each block, a precomputed dynamic programming (DP) table (`dp_fast`) is used to look up the number of ways to choose a certain number of cards from the set bits in that block.
+
+Here's how the algorithm works step by step:
+**Example:**
+
+Suppose we want to compute the hash for a 7-card hand consisting of cards:  
+`{0, 1, 2, 16, 20, 33, 50}`  
+These correspond to the following bit positions in the 52-bit hand mask:
+
+- Block 0 (cards 0–15): cards 0, 1, 2 → bits 0, 1, 2 set  
+- Block 1 (cards 16–31): cards 16, 20 → bits 0 and 4 are set because within this block, card 16 corresponds to bit 0 (the first card in the block), and card 20 corresponds to bit 4 (the fifth card in the block).  
+- Block 2 (cards 32–47): card 33 → bit 1 set  
+- Block 3 (cards 48–51): card 50 → bit 2 set
+
+Let's construct the 16-bit values for each block:
+**0b0000 implies binary representation**
+Let's break down how to obtain the hexadecimal values for each block from the set of card indices:
+
+- **Block 0 (`a[0]`):** This block covers cards 0–15. In our example, cards 0, 1, and 2 are present.  
+  - To represent these in a 16-bit block, set bits 0, 1, and 2 to 1 (all other bits are 0).  
+  - In binary: `0000 0000 0000 0111`  
+    - Bit 0 (rightmost) = 1 (card 0 present)
+    - Bit 1 = 1 (card 1 present)
+    - Bit 2 = 1 (card 2 present)
+    - Bits 3–15 = 0 (no other cards from this block)
+  - To convert this binary to hexadecimal:
+    - The binary `0000 0000 0000 0111` is 7 in decimal, which is `0x0007` in hexadecimal.
+
+- **Block 1 (`a[1]`):** This block covers cards 16–31. In our example, cards 16 and 20 are present.
+  - Within this block, card 16 is bit 0, and card 20 is bit 4 (since 20 - 16 = 4).
+  - Set bits 0 and 4 to 1:
+    - Binary: `0000 0000 0001 0001`
+      - Bit 0 = 1 (card 16)
+      - Bit 4 = 1 (card 20)
+      - All other bits = 0
+    - To convert: `0000 0000 0001 0001` in binary is 16 + 1 = 17 in decimal, which is `0x0011` in hexadecimal.
+
+- **Block 2 (`a[2]`):** This block covers cards 32–47. Only card 33 is present.
+  - Card 33 is bit 1 in this block (33 - 32 = 1).
+  - Set bit 1 to 1:
+    - Binary: `0000 0000 0000 0010`
+      - Bit 1 = 1 (card 33)
+      - All other bits = 0
+    - In decimal: 2, which is `0x0002` in hexadecimal.
+
+- **Block 3 (`a[3]`):** This block covers cards 48–51. Only card 50 is present.
+  - Card 50 is bit 2 in this block (50 - 48 = 2).
+  - Set bit 2 to 1:
+    - Binary: `0000 0000 0000 0100`
+      - Bit 2 = 1 (card 50)
+      - All other bits = 0
+    - In decimal: 4, which is `0x0004` in hexadecimal.
+
+| Block   | Cards Present | Bits Set (relative to block) | Binary Representation     | Hexadecimal |
+|---------|---------------|------------------------------|---------------------------|-------------|
+| a[0]    | 0, 1, 2       | 0, 1, 2                      | 0000 0000 0000 0111       | 0x0007      |
+| a[1]    | 16, 20        | 0, 4                         | 0000 0000 0001 0001       | 0x0011      |
+| a[2]    | 33            | 1                            | 0000 0000 0000 0010       | 0x0002      |
+| a[3]    | 50            | 2                            | 0000 0000 0000 0100       | 0x0004      |
+
+This process can be generalized:  
+For each card in the hand, determine which block it belongs to, and set the corresponding bit (card index minus block base) in that block's 16-bit value. The resulting binary value for each block can then be directly converted to hexadecimal for use in the algorithm.
+
+Let `k = 7` (number of cards in the hand).
+
+The hash is computed as follows:
+1. **Block Division:** The 52 bits representing the hand are split into four blocks:
+   - Block 0: cards 0–15 (16 bits)
+   - Block 1: cards 16–31 (16 bits)
+   - Block 2: cards 32–47 (16 bits)
+   - Block 3: cards 48–51 (4 bits, padded to 16 bits for alignment)
+
+2. **DP Table Lookup:** For each block, the algorithm uses the 16-bit pattern of that block and the current value of `k` (the number of cards left to choose) to look up a precomputed value in the DP table. This value represents the number of ways to choose `k` cards from the set bits in the current block and all lower-indexed blocks.
+
+3. **Summation and Decrement:** The hash value is computed by summing the DP table values for each block, starting from the highest block (Block 3) down to the lowest (Block 0). After processing each block, `k` is decremented by the number of set bits in that block (using a precomputed `bitcount` table).
+
+
+Although this approach minimizes CPU computation (just 4 table lookups, 4 additions, and 3 decrements), its real-world performance is limited by memory access speed. The DP table for 16-bit blocks is quite large (over 64KB), which can exceed the size of a typical CPU cache or memory page, leading to slower memory access.
+
+To address this, one might try splitting the hand into smaller 8-bit blocks, reducing the size of each DP table and potentially improving cache performance. However, this increases the number of operations (now 8 lookups and 7 decrements per hash calculation). Even with this adjustment, the overall speed still does not surpass the algorithm used in previous chapters, likely due to the overhead of additional memory accesses.
+
+In short, while the algorithm is computationally efficient, its performance is ultimately constrained by memory bandwidth and cache behavior, making it not significantly faster than the previous methods described in earlier chapters.
