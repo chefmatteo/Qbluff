@@ -80,3 +80,6 @@ Thumbs.db
 *.aps
 *.ncb
 *.opendb
+
+# Ignore trial.cpp (temporary or experimental file)
+trial.cpp

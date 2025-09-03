@@ -8,6 +8,9 @@ Run: (all arguments are optional, defaults to 9 player full runouts)
 e.g.
   ./sim 5 3 10 1000
   plays out 6 handed, just the flop, highlights the top 10% of hands, only runs 1000 simulations per hand (1M is better, but takes longer)
+
+this is the function to generate the runouts for the simulation
+link to the original code: https://gist.github.com/bwasti/c2ca972c57f4fb581813f82f010c7cb2
 */
 
 #include <algorithm>
