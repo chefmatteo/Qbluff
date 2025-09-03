@@ -8,11 +8,11 @@ extern "C" {
 
 namespace card_sampler {
 class CardSampler {
-  std::array<int, 52> deck;
+  std::array<int, 52> deck; //array of 52 integers, each representing a card
 
- public:
-  CardSampler(void);
-  std::vector<int> sample(int size);
+public:
+  CardSampler(void); //constructor of the class; 
+  std::vector<int> sample(int size); 
 };
 }  // namespace card_sampler
 
