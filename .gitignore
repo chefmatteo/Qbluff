@@ -84,14 +84,67 @@ Thumbs.db
 # Ignore trial.cpp (temporary or experimental file)
 trial.cpp
 
-
+# Ignore all executables and binaries
 c_example
 cpp_example
 plo4_example
 plo5_example
 plo6_example
 omaha_example
+basic_test
+sim
+plo4_test
+library_demo
 
+# Ignore all library files
+*.a
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
 
-.a
-.o
+# Ignore all executables generated from .cc files
+*.cc.exe
+*.cc.out
+*.cc.elf
+*.cc.run
+*.cc.bin
+
+# Ignore all raw example/demo files
+library_demo
+library_demo.*
+evaluator5_standalone_example
+evaluator5_standalone_example.*
+cpp_example
+cpp_example.*
+plo4_example
+plo4_example.*
+plo5_example
+plo5_example.*
+plo6_example
+plo6_example.*
+omaha_example
+omaha_example.*
+trial
+trial.*
+
+# Ignore all object files recursively
+**/*.o
+**/*.obj
+
+# Ignore all executable files recursively
+**/basic_test
+**/sim
+**/plo4_test
+**/library_demo
+**/trial
+
+# Ignore all library files recursively
+**/*.a
+**/*.so
+**/*.dylib
+**/*.dll
+
+# Add any other raw example/demo files as needed
+
